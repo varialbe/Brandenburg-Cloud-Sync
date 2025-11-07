@@ -10,6 +10,8 @@ from urllib.parse import urlparse, parse_qsl
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
+import mimetypes
+
 
 BASE = "https://brandenburg.cloud"
 
@@ -215,6 +217,102 @@ def main():
         finalize(s, display_name, mime, size, storage_key)
 
         print("✅ Fertig. Datei registriert.")
+
+def create_session(username: str, password: str) -> requests.Session:
+    """Einmal einloggen und Session zurückgeben."""
+    s = requests.Session()
+    s.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    })
+
+    # 1) CSRF von /login (oder /) holen
+    r = s.get(f"{BASE}/login", allow_redirects=True)
+    r.raise_for_status()
+    csrf = get_csrf_from_html(r.text)  # <-- hier statt _extract_csrf_from_html
+    if not csrf:
+        # Fallback über Startseite probieren
+        r2 = s.get(f"{BASE}/", allow_redirects=True)
+        r2.raise_for_status()
+        csrf = get_csrf_from_html(r2.text)
+    if not csrf:
+        die("CSRF-Token beim Login nicht gefunden.")
+
+    # 2) Login-POST
+    data = {
+        "redirect": "",
+        "username": username,
+        "password": password,
+        "schoolId": "",
+        "_csrf": csrf,
+    }
+    r = s.post(f"{BASE}/login", data=data, allow_redirects=True)
+    r.raise_for_status()
+
+    # 3) Verifizieren, dass wir eingeloggt sind (Dashboard darf keine Login-Seite sein)
+    dash = s.get(f"{BASE}/dashboard", allow_redirects=True)
+    dash.raise_for_status()
+    if b"Login - Schul-Cloud" in dash.content or "Login - Schul-Cloud" in dash.text:
+        die("Login fehlgeschlagen: Dashboard zeigt Login-Seite.")
+
+    return s
+
+
+def upload_with_session(session: requests.Session, file_path: str) -> dict:
+    """Nutzt die bestehende Session, macht INIT → S3 PUT → fileModel POST."""
+    p = Path(file_path)
+    if not p.is_file():
+        raise FileNotFoundError(p)
+
+    mime, _ = mimetypes.guess_type(str(p))
+    if not mime:
+        mime = "application/octet-stream"
+
+    # CSRF von /files/my/ holen
+    csrf = must_get_csrf(session, "/files/my/")
+    # INIT
+    init_headers = {
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "csrf-token": csrf,
+        "Referer": f"{BASE}/files/my/",
+    }
+    init_data = {"type": mime, "filename": p.name}
+    r = session.post(f"{BASE}/files/file", data=init_data, headers=init_headers)
+    r.raise_for_status()
+    j = r.json()
+    su = j.get("signedUrl") or {}
+    presigned_url = su.get("url")
+    signed_headers = su.get("header") or {}
+    storage = signed_headers.get("x-amz-meta-flat-name")
+    if not storage and presigned_url:
+        from urllib.parse import urlparse, parse_qsl
+        storage = dict(parse_qsl(urlparse(presigned_url).query)).get("x-amz-meta-flat-name")
+    if not presigned_url or not storage:
+        raise RuntimeError(f"Unerwartetes INIT-JSON: {j}")
+
+    # S3 PUT mit GENAU den signierten Headern
+    with open(p, "rb") as f:
+        put = requests.put(presigned_url, data=f.read(), headers=signed_headers)
+    if put.status_code not in (200, 201, 204):
+        raise RuntimeError(f"S3 PUT failed {put.status_code}: {put.text[:200]}")
+
+    # fileModel POST
+    fm_headers = {
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "csrf-token": csrf,
+        "Referer": f"{BASE}/files/my/",
+    }
+    fm_data = {
+        "name": p.name,
+        "type": mime,
+        "size": p.stat().st_size,
+        "storageFileName": storage,
+    }
+    r = session.post(f"{BASE}/files/fileModel", data=fm_data, headers=fm_headers)
+    r.raise_for_status()
+    return {"ok": True, "name": p.name, "size": p.stat().st_size, "mime": mime}
 
 if __name__ == "__main__":
     main()
