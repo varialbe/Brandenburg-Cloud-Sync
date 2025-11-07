@@ -4,9 +4,6 @@
   <img src="https://i.imgur.com/4lS8eg5.jpeg" alt="Brandenburg Cloud Folder Sync Banner" width="820">
 </p>
 
-# 🗂️ Brandenburg Cloud Folder Sync
-
-
 ## 1. Was das Tool ist
 **Brandenburg Cloud Folder Sync** ist ein Python-Tool mit GUI, das automatisch ganze Ordner in die [Schul-Cloud Brandenburg](https://brandenburg.cloud) hochlädt.  
 Es loggt sich mit echten Schul-Zugangsdaten ein, holt intern die benötigten CSRF-Tokens, erzeugt signierte Upload-URLs (Presigned S3 URLs) und lädt die Dateien dann sicher direkt auf den Schul-Cloud-Speicher hoch.
