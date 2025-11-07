@@ -39,7 +39,7 @@ Mit Parallel-Uploads (Multithreading) wären sogar **1 MB/s +** locker möglich.
 ## 4. Hinweis / Disclaimer
 Dieses Tool wurde **nur zu Lern- und Bildungszwecken** entwickelt.  
 Es demonstriert, wie Web-Logins, CSRF-Tokens und signierte URLs technisch funktionieren.  
-Es **soll keine Schul-Cloud-Nutzung automatisieren oder missbrauchen**, sondern lediglich zeigen, wie man als Schüler aus begrenzten Tools etwas Praktisches herausholen kann.
+Es **soll keine Schul-Cloud-Nutzung automatisieren oder missbrauchen**, sondern lediglich zeigen, wie man als Schüler aus begrenzten Tools etwas Praktisches herausholen kann. Zudem wird stark empfohlen alle hochzuladenden Dateien in ein 7z-Archiv zu packen und zu verschlüsseln. Bitte bedenkt, dass dieser Speicherplatz nur mit einem gültigen Schul-Login erreichbar ist.
 
 ---
 
@@ -60,4 +60,4 @@ Das würde die Effizienz massiv steigern – theoretisch bis zur Maximalbandbrei
 ---
 
 © 2025 – Educational Use Only  
-Author: Mateen Batt (`@tini`)  
+Author: @varialbe 
